@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Elephant Escape · Maze Rush</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body {
+            margin: 0;
+            background: #111420;
+            color: #f0f4fa;
+            font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 12px;
+            overflow: hidden;
+        }
+
+        h1 {
+            margin: 4px 0;
+            font-weight: 600;
+            letter-spacing: 1px;
+            color: #ffe484;
+            text-shadow: 0 2px 8px rgba(255, 228, 132, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 1.8rem;
+        }
+        h1 small {
+            font-size: 0.9rem;
+            color: #8fa0b5;
+            font-weight: 300;
+            text-transform: uppercase;
+        }
+
+        #ui-container {
+            display: flex;
+            gap: 24px;
+            font-size: 1.1rem;
+            background: #1e2533;
+            padding: 6px 24px;
+            border-radius: 40px;
+            margin-bottom: 12px;
+            box-shadow: inset 0 2px 6px rgba(0,0,0,0.5), 0 4px 10px rgba(0,0,0,0.3);
+            font-weight: 600;
+            border: 1px solid #2f3a4f;
+        }
+        #ui-container span {
+            color: #ffd966;
+        }
+
+        #game-wrapper {
+            position: relative;
+        }
+
+        #game-container {
+            position: relative;
+            width: 600px;
+            height: 480px;
+            background: #151a24;
+            border: 3px solid #3d4a5e;
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow: 0 16px 40px rgba(0,0,0,0.6);
+        }
+
+        /* Screen Shake Animation */
+        @keyframes shake {
+            0%, 100% { transform: translate(0, 0); }
+            10%, 30%, 50%, 70%, 90% { transform: translate(-4px, 2px); }
+            20%, 40%, 60%, 80% { transform: translate(4px, -2px); }
+        }
+        .shake-effect {
+            animation: shake 0.4s ease-in-out;
+        }
+
+        /* ---- ELEPHANT (player) ---- */
+        #player {
+            position: absolute;
+            width: 34px;
+            height: 34px;
+            z-index: 20;
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.4));
+            pointer-events: none;
+            /* Transitions removed to fix the lag/stutter bug */
+            transform-origin: center;
+        }
+        #player svg {
+            display: block;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.12s ease-out; /* Dynamic sprite flip */
+        }
+
+        /* Floor views */
+        .floor-view {
+            position: absolute;
+            width: 100%;
+            height: 120px;
+            left: 0;
+            border-bottom: 2px dashed #222d3d;
+            box-sizing: border-box;
+            background: #171f2b;
+        }
+        .floor-label {
+            position: absolute;
+            left: 12px;
+            top: 8px;
+            color: #aab9d0;
+            font-size: 0.75rem;
+            font-weight: 700;
+            background: rgba(10, 14, 23, 0.85);
+            padding: 3px 10px;
+            border-radius: 20px;
+            backdrop-filter: blur(2px);
+            letter-spacing: 0.5px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .platform-segment {
+            position: absolute;
+            height: 16px;
+            background: linear-gradient(180deg, #5d6f87 0%, #465568 100%);
+            bottom: 18px;
+            border-radius: 6px 6px 0 0;
+            box-shadow: inset 0 1px 2px #9aafc9, 0 3px 6px rgba(0,0,0,0.4);
+        }
+
+        /* ---- POLICE (enemy) ---- */
+        .enemy-unit {
+            position: absolute;
+            width: 28px;
+            height: 32px;
+            bottom: 28px;
+            filter: drop-shadow(0 4px 6px rgba(220, 0, 0, 0.4));
+            z-index: 10;
+        }
+        .enemy-unit svg {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* UI Overlay Screen */
+        #screen-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(8, 12, 22, 0.92);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 30;
+            padding: 24px;
+            text-align: center;
+        }
+        #screen-overlay h2 {
+            font-size: 2.4rem;
+            margin: 0 0 12px;
+            color: #ffd966;
+            text-shadow: 0 0 15px rgba(255, 217, 102, 0.3);
+        }
+        #screen-overlay p {
+            max-width: 85%;
+            font-size: 1.05rem;
+            line-height: 1.6;
+            color: #b1c3db;
+            margin: 0 0 16px;
+        }
+        .btn {
+            padding: 14px 40px;
+            font-size: 1.25rem;
+            background: #f5c542;
+            color: #111420;
+            border: none;
+            border-radius: 60px;
+            cursor: pointer;
+            font-weight: 700;
+            transition: 0.15s;
+            box-shadow: 0 6px 0 #b3851b, 0 8px 20px rgba(0,0,0,0.4);
+        }
+        .btn:hover {
+            background: #ffd966;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 0 #b3851b, 0 12px 24px rgba(0,0,0,0.5);
+        }
+        .btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 4px 0 #b3851b;
+        }
+
+        #controls-hint {
+            margin-top: 14px;
+            color: #8fa1bd;
+            font-size: 0.85rem;
+            background: rgba(30, 38, 56, 0.6);
+            padding: 6px 20px;
+            border-radius: 50px;
+            backdrop-filter: blur(2px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        #controls-hint strong {
+            color: #ffd966;
+        }
+        .safe-badge {
+            color: #52d287 !important;
+            font-weight: bold;
+        }
+
+        /* Mobile Controls */
+        #mobile-controls {
+            display: none;
+            width: 100%;
+            max-width: 600px;
+            justify-content: space-between;
+            gap: 20px;
+            margin-top: 15px;
+            padding: 0 10px;
+        }
+        .touch-btn {
+            flex: 1;
+            height: 64px;
+            background: rgba(47, 58, 79, 0.7);
+            border: 2px solid #465673;
+            border-radius: 16px;
+            color: #f0f4fa;
+            font-size: 1.8rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            touch-action: manipulation;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            transition: background 0.1s, transform 0.05s;
+        }
+        .touch-btn:active {
+            background: #f5c542;
+            color: #111420;
+            border-color: #f5c542;
+            transform: scale(0.96);
+        }
+
+        @media (max-width: 620px) {
+            #game-container {
+                width: 100%;
+                max-width: 360px;
+                height: 400px;
+            }
+            #mobile-controls {
+                display: flex;
+            }
+            #controls-hint {
+                display: none;
+            }
+            h1 {
+                font-size: 1.4rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>
+        🐘 ELEPHANT ESCAPE
+        <small>· maze rush</small>
+    </h1>
+    <div id="ui-container">
+        <div>Floor <span id="floor-display">100</span></div>
+        <div>🍌 <span id="score-display">0</span></div>
+    </div>
+
+    <div id="game-wrapper">
+        <div id="game-container">
+            <!-- PLAYER (elephant) -->
+            <div id="player">
+                <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Adjusted SVG colors to look cohesive -->
+                    <circle cx="16" cy="16" r="14" fill="#6C8B9F" stroke="#2F4559" stroke-width="1.5"/>
+                    <circle cx="10" cy="12" r="2.8" fill="#1F2A36"/>
+                    <circle cx="22" cy="12" r="2.8" fill="#1F2A36"/>
+                    <circle cx="10.8" cy="11.2" r="1" fill="white"/>
+                    <circle cx="21.8" cy="11.2" r="1" fill="white"/>
+                    <ellipse cx="16" cy="20" rx="5" ry="3.5" fill="#E5C8A0"/>
+                    <path d="M12 24 Q16 27 20 24" stroke="#2F4559" stroke-width="1.8" fill="none"/>
+                    <!-- ears -->
+                    <ellipse cx="4" cy="12" rx="5" ry="8" fill="#5D7A8C" stroke="#2F4559" stroke-width="1"/>
+                    <ellipse cx="28" cy="12" rx="5" ry="8" fill="#5D7A8C" stroke="#2F4559" stroke-width="1"/>
+                    <!-- tusks -->
+                    <path d="M10 19 L7 23" stroke="#F5EDE0" stroke-width="2.5" stroke-linecap="round"/>
+                    <path d="M22 19 L25 23" stroke="#F5EDE0" stroke-width="2.5" stroke-linecap="round"/>
+                    <!-- trunk (matched to elephant body tone #6C8B9F for realism) -->
+                    <path d="M16 22 Q14 27 12 25" stroke="#6C8B9F" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+                </svg>
+            </div>
+
+            <div id="viewports-wrapper"></div>
+
+            <div id="screen-overlay">
+                <h2 id="overlay-title">🐘 Find the safe drop</h2>
+                <p id="overlay-desc">
+                    Move left/right to choose a hole. One hole drops you safely, the other leads straight to the police patrol. <br>
+                    Some floors are completely safe – watch the label indicators!
+                </p>
+                <button class="btn" id="start-btn" onclick="startGame()">Start Escape</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="controls-hint">
+        <strong>← →</strong> (or <strong>A/D</strong>) Move elephant &nbsp;·&nbsp; drop through openings to go down
+    </div>
+
+    <!-- Virtual D-pad for mobile -->
+    <div id="mobile-controls">
+        <div class="touch-btn" id="btn-left">◀</div>
+        <div class="touch-btn" id="btn-right">▶</div>
+    </div>
+
+    <script>
+        (function() {
+            let GAME_WIDTH = 600;
+            const VISIBLE_FLOORS_COUNT = 3;
+            const VIEW_HEIGHT = 120;
+
+            let currentFloor = 100;
+            let score = 0;
+            let playerX = 60;
+            let isPlaying = false;
+            let animationFrameId;
+            let isFalling = false;          
+            let towerData = {};
+
+            // Gamepad/Keys state tracking
+            const keysPressed = {};
+            const PLAYER_SPEED = 6.2; // Smooth physics velocity speed constant
+            const PLAYER_WIDTH = 32;
+
+            const playerEl = document.getElementById('player');
+            const playerSvg = playerEl.querySelector('svg');
+            const viewportsWrapper = document.getElementById('viewports-wrapper');
+            const floorDisplay = document.getElementById('floor-display');
+            const scoreDisplay = document.getElementById('score-display');
+            const overlay = document.getElementById('screen-overlay');
+            const overlayTitle = document.getElementById('overlay-title');
+            const overlayDesc = document.getElementById('overlay-desc');
+            const startBtn = document.getElementById('start-btn');
+            const gameContainer = document.getElementById('game-container');
+
+            // Virtual button state tracking
+            let mobileLeft = false;
+            let mobileRight = false;
+
+            // Handle responsive canvas width shifts
+            function handleResize() {
+                GAME_WIDTH = gameContainer.clientWidth;
+                if (playerX > GAME_WIDTH - PLAYER_WIDTH) {
+                    playerX = GAME_WIDTH - PLAYER_WIDTH;
+                }
+                updatePlayerDOM();
+            }
+            window.addEventListener('resize', handleResize);
+            setTimeout(handleResize, 100);
+
+            // Generate tower map
+            function generateEntireTowerStructure() {
+                towerData = {};
+                for (let f = 100; f >= 1; f--) {
+                    let hole1 = 30 + Math.random() * 130;
+                    let hole2 = 380 + Math.random() * 130;
+                    
+                    if (hole2 - hole1 < 100) {
+                        hole2 = Math.min(GAME_WIDTH - 50, hole1 + 130 + Math.random() * 80);
+                    }
+                    
+                    hole1 = Math.max(10, Math.min(GAME_WIDTH - 80, hole1));
+                    hole2 = Math.max(10, Math.min(GAME_WIDTH - 80, hole2));
+                    
+                    if (hole1 > hole2) { let tmp = hole1; hole1 = hole2; hole2 = tmp; }
+                    
+                    const h1 = { start: hole1, width: 48 };
+                    const h2 = { start: hole2, width: 48 };
+
+                    const hasEnemy = (f < 100) && (Math.random() > 0.2);
+                    const trapHole = Math.random() > 0.5 ? h1.start : h2.start;
+                    const enemyMinX = Math.max(4, trapHole - 58);
+                    const enemyMaxX = Math.min(GAME_WIDTH - 28, trapHole + 58);
+
+                    towerData[f] = {
+                        floorNum: f,
+                        holes: [h1, h2],
+                        hasEnemy: hasEnemy,
+                        enemyX: enemyMinX + 10,
+                        enemyMinX: enemyMinX,
+                        enemyMaxX: enemyMaxX,
+                        enemyDir: 1,
+                        enemySpeed: 1.8 + (100 - f) * 0.035
+                    };
+                }
+            }
+
+            function renderVisibleFloors() {
+                viewportsWrapper.innerHTML = '';
+                for (let i = 0; i < VISIBLE_FLOORS_COUNT; i++) {
+                    const targetFloorNum = currentFloor - i;
+                    if (targetFloorNum < 1) break;
+                    const fData = towerData[targetFloorNum];
+                    if (!fData) continue;
+
+                    const fView = document.createElement('div');
+                    fView.className = 'floor-view';
+                    fView.style.top = (i * VIEW_HEIGHT) + 'px';
+                    fView.id = `floor-view-${targetFloorNum}`;
+
+                    const label = document.createElement('div');
+                    label.className = 'floor-label';
+                    const safeText = fData.hasEnemy ? '' : ' · <span class="safe-badge">✅ SAFE</span>';
+                    label.innerHTML = `Floor ${targetFloorNum}${safeText}`;
+                    fView.appendChild(label);
+
+                    // Draw solid floor tiles
+                    const sortedHoles = [...fData.holes].sort((a, b) => a.start - b.start);
+                    let currentX = 0;
+                    sortedHoles.forEach(hole => {
+                        if (hole.start > currentX) {
+                            createSegmentDOM(fView, currentX, hole.start - currentX);
+                        }
+                        currentX = hole.start + hole.width;
+                    });
+                    if (currentX < GAME_WIDTH) {
+                        createSegmentDOM(fView, currentX, GAME_WIDTH - currentX);
+                    }
+
+                    // Draw patrolling police units
+                    if (fData.hasEnemy) {
+                        const enemyEl = document.createElement('div');
+                        enemyEl.className = 'enemy-unit';
+                        enemyEl.id = `enemy-${targetFloorNum}`;
+                        enemyEl.innerHTML = `
+                            <svg viewBox="0 0 28 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <rect x="1" y="8" width="26" height="22" rx="6" fill="#1C3F6E" stroke="#0B1D33" stroke-width="1.5"/>
+                                <rect x="4" y="12" width="6" height="4" rx="2" fill="#FFD966" stroke="#B38F40" stroke-width="1"/>
+                                <rect x="18" y="12" width="6" height="4" rx="2" fill="#FFD966" stroke="#B38F40" stroke-width="1"/>
+                                <circle cx="9" cy="9" r="3.5" fill="#F5D6B8" stroke="#0B1D33" stroke-width="1"/>
+                                <circle cx="19" cy="9" r="3.5" fill="#F5D6B8" stroke="#0B1D33" stroke-width="1"/>
+                                <circle cx="8.5" cy="8.5" r="1.2" fill="#0B1D33"/>
+                                <circle cx="18.5" cy="8.5" r="1.2" fill="#0B1D33"/>
+                                <rect x="10" y="19" width="8" height="8" rx="2" fill="#0B1D33"/>
+                                <rect x="12" y="21" width="4" height="4" rx="1" fill="#FFD966"/>
+                                <rect x="1" y="27" width="26" height="5" rx="2" fill="#2D4B6E" stroke="#0B1D33" stroke-width="1.2"/>
+                                <rect x="0" y="30" width="6" height="5" rx="1" fill="#4A5D7A" />
+                                <rect x="22" y="30" width="6" height="5" rx="1" fill="#4A5D7A" />
+                                <path d="M12 5 L12 2 L16 2 L16 5" stroke="#F5D6B8" stroke-width="2"/>
+                                <path d="M0 15 L4 15" stroke="#FFD966" stroke-width="2.5" stroke-linecap="round"/>
+                                <path d="M24 15 L28 15" stroke="#FFD966" stroke-width="2.5" stroke-linecap="round"/>
+                            </svg>
+                        `;
+                        fView.appendChild(enemyEl);
+                    }
+                    viewportsWrapper.appendChild(fView);
+                }
+            }
+
+            function createSegmentDOM(parent, x, width) {
+                const seg = document.createElement('div');
+                seg.className = 'platform-segment';
+                seg.style.left = x + 'px';
+                seg.style.width = width + 'px';
+                parent.appendChild(seg);
+            }
+
+            function updatePlayerDOM() {
+                playerEl.style.left = playerX + 'px';
+                if (!isFalling) {
+                    playerEl.style.top = (VIEW_HEIGHT - 40) + 'px';
+                }
+            }
+
+            // Forgiving hole detection logic
+            function checkHoleDrop() {
+                if (!isPlaying || isFalling) return;
+                const activeFloorData = towerData[currentFloor];
+                if (!activeFloorData) return;
+
+                let dropped = false;
+                let targetHole = null;
+
+                for (let hole of activeFloorData.holes) {
+                    // Calculate center point of the elephant
+                    const playerCenter = playerX + (PLAYER_WIDTH / 2);
+                    
+                    // The player drops if their center point is inside the hole with a 4px cushion
+                    if (playerCenter >= (hole.start + 2) && playerCenter <= (hole.start + hole.width - 2)) {
+                        dropped = true;
+                        targetHole = hole;
+                        break;
+                    }
+                }
+
+                if (dropped && targetHole) {
+                    triggerSmoothFall(targetHole);
+                }
+            }
+
+            // Smooth drop animation (magnetizes the player horizontally to center of hole as they drop)
+            function triggerSmoothFall(hole) {
+                if (isFalling) return;
+                isFalling = true;
+
+                const startY = VIEW_HEIGHT - 40;
+                const endY = VIEW_HEIGHT + 80;
+                
+                const startX = playerX;
+                // Magnetization target: center the elephant in the hole
+                const endX = (hole.start + (hole.width / 2)) - (PLAYER_WIDTH / 2); 
+
+                const duration = 220; // Fast and clean fall action speed (ms)
+                const startTime = performance.now();
+
+                function animateFall(time) {
+                    const elapsed = time - startTime;
+                    const progress = Math.min(elapsed / duration, 1);
+                    
+                    // Ease-in for realistic gravity drop acceleration
+                    const easedY = progress * progress;
+                    // Ease-out for horizontal centering slide
+                    const easedX = 1 - Math.pow(1 - progress, 2);
+
+                    const currentY = startY + (endY - startY) * easedY;
+                    const currentX = startX + (endX - startX) * easedX;
+
+                    playerX = currentX;
+                    playerEl.style.top = currentY + 'px';
+                    playerEl.style.left = playerX + 'px';
+
+                    if (progress < 1) {
+                        requestAnimationFrame(animateFall);
+                    } else {
+                        // Reset player Y alignment position offset
+                        playerEl.style.top = (VIEW_HEIGHT - 40) + 'px';
+                        isFalling = false;
+                        applyFloorTransition();
+                    }
+                }
+                requestAnimationFrame(animateFall);
+            }
+
+            function applyFloorTransition() {
+                score += calculatePoints(currentFloor);
+                currentFloor--;
+                floorDisplay.textContent = currentFloor;
+                scoreDisplay.textContent = score;
+
+                if (currentFloor <= 1) {
+                    score += calculatePoints(1);
+                    scoreDisplay.textContent = score;
+                    endGame(true);
+                } else {
+                    renderVisibleFloors();
+                    updatePlayerDOM();
+                }
+            }
+
+            function calculatePoints(floorPassed) {
+                if (floorPassed >= 80) return 12;
+                if (floorPassed >= 40) return 25;
+                if (floorPassed > 2) return 55;
+                return 300;
+            }
+
+            // --- The Unified Game Loop (replaces setInterval) ---
+            function gameLoopTick() {
+                if (!isPlaying) return;
+
+                // 1. Process Smooth Player Movements (Damping & Velocity integration)
+                let moving = false;
+                if (keysPressed['ArrowLeft'] || keysPressed['KeyA'] || mobileLeft) {
+                    playerX = Math.max(0, playerX - PLAYER_SPEED);
+                    playerSvg.style.transform = 'scaleX(1)'; // Face left
+                    moving = true;
+                }
+                if (keysPressed['ArrowRight'] || keysPressed['KeyD'] || mobileRight) {
+                    playerX = Math.min(GAME_WIDTH - PLAYER_WIDTH, playerX + PLAYER_SPEED);
+                    playerSvg.style.transform = 'scaleX(-1)'; // Face right (flip)
+                    moving = true;
+                }
+
+                if (moving && !isFalling) {
+                    updatePlayerDOM();
+                    checkHoleDrop();
+                }
+
+                // 2. Process Enemy Patrol AI
+                for (let i = 0; i < VISIBLE_FLOORS_COUNT; i++) {
+                    const targetFloorNum = currentFloor - i;
+                    if (targetFloorNum < 1) break;
+                    const fData = towerData[targetFloorNum];
+                    if (!fData || !fData.hasEnemy) continue;
+
+                    fData.enemyX += fData.enemySpeed * fData.enemyDir;
+                    if (fData.enemyX <= fData.enemyMinX || fData.enemyX >= fData.enemyMaxX) {
+                        fData.enemyDir *= -1;
+                    }
+
+                    const enemyEl = document.getElementById(`enemy-${targetFloorNum}`);
+                    if (enemyEl) {
+                        enemyEl.style.left = fData.enemyX + 'px';
+                    }
+
+                    // Collisions are only active for the player's CURRENT floor while running
+                    if (targetFloorNum === currentFloor && !isFalling) {
+                        const enemyWidth = 28;
+                        if (playerX < fData.enemyX + enemyWidth - 4 && 
+                            playerX + PLAYER_WIDTH - 4 > fData.enemyX) {
+                            
+                            // Trigger screen shake on collision
+                            gameContainer.classList.add('shake-effect');
+                            setTimeout(() => {
+                                gameContainer.classList.remove('shake-effect');
+                            }, 400);
+
+                            endGame(false);
+                            return;
+                        }
+                    }
+                }
+
+                animationFrameId = requestAnimationFrame(gameLoopTick);
+            }
+
+            function endGame(isVictory) {
+                isPlaying = false;
+                cancelAnimationFrame(animationFrameId);
+                overlay.style.display = 'flex';
+
+                if (isVictory) {
+                    overlayTitle.textContent = "🏆 ESCAPED!";
+                    overlayDesc.innerHTML = `You outsmarted the police! <br>Final score: <strong>${score}</strong> bananas 🍌`;
+                    startBtn.textContent = "Play Again";
+                } else {
+                    overlayTitle.textContent = "🚨 ARRESTED!";
+                    overlayDesc.innerHTML = `The police caught you on floor ${currentFloor}. <br>Collected: <strong>${score}</strong> bananas.`;
+                    startBtn.textContent = "Try Again";
+                }
+            }
+
+            window.startGame = function() {
+                currentFloor = 100;
+                score = 0;
+                playerX = 60;
+                isPlaying = true;
+                isFalling = false;
+                overlay.style.display = 'none';
+
+                generateEntireTowerStructure();
+                renderVisibleFloors();
+                updatePlayerDOM();
+
+                floorDisplay.textContent = currentFloor;
+                scoreDisplay.textContent = score;
+
+                // Stop active frame callbacks and restart cleanly
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = requestAnimationFrame(gameLoopTick);
+            };
+
+            // --- Keyboard Hook Listeners ---
+            window.addEventListener('keydown', (e) => {
+                if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'KeyA', 'KeyD', 'Space'].includes(e.code)) {
+                    e.preventDefault(); // Prevent page scrolling
+                }
+                keysPressed[e.code] = true;
+                keysPressed[e.key] = true; 
+            });
+
+            window.addEventListener('keyup', (e) => {
+                keysPressed[e.code] = false;
+                keysPressed[e.key] = false;
+            });
+
+            // --- Mobile Touch Event Handlers ---
+            const btnLeft = document.getElementById('btn-left');
+            const btnRight = document.getElementById('btn-right');
+
+            btnLeft.addEventListener('touchstart', (e) => { e.preventDefault(); mobileLeft = true; }, {passive: false});
+            btnLeft.addEventListener('touchend', (e) => { e.preventDefault(); mobileLeft = false; }, {passive: false});
+            btnRight.addEventListener('touchstart', (e) => { e.preventDefault(); mobileRight = true; }, {passive: false});
+            btnRight.addEventListener('touchend', (e) => { e.preventDefault(); mobileRight = false; }, {passive: false});
+
+            // Fallback mouse clicks for mobile testing on desktops
+            btnLeft.addEventListener('mousedown', () => mobileLeft = true);
+            btnLeft.addEventListener('mouseup', () => mobileLeft = false);
+            btnLeft.addEventListener('mouseleave', () => mobileLeft = false);
+            btnRight.addEventListener('mousedown', () => mobileRight = true);
+            btnRight.addEventListener('mouseup', () => mobileRight = false);
+            btnRight.addEventListener('mouseleave', () => mobileRight = false);
+
+            // --- Setup Game state variables on load ---
+            generateEntireTowerStructure();
+            renderVisibleFloors();
+            updatePlayerDOM();
+            floorDisplay.textContent = '100';
+            scoreDisplay.textContent = '0';
+        })();
+    </script>
+</body>
+</html>
